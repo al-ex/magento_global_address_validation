@@ -4,7 +4,6 @@
         <CraftyClicksValidate>
             <active>false</active>
             <codePool>local</codePool>
-            <version>0.1.4</version>
         </CraftyClicksValidate>
     </modules>
 </config>

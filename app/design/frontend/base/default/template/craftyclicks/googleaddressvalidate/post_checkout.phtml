@@ -54,7 +54,7 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 							<label for="region">Region:</label>
 							<div class="input-box">
 								<input type="text" class="crafty-input" id="region"/>
-								<select id="region_id" name="region_id" class="crafty-input">					                            
+								<select id="region_id" name="region_id" class="crafty-input">
 									<?php
 									if(!$confG['region_dropdown']){
 										$states = Mage::getModel('directory/country')->load($shippingAddress->country_id)->getRegions()->toOptionArray();
@@ -70,16 +70,16 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 					</li>
 				</ul>
 			</div>
-		
+
 		<button class="button" id="button-crafty-modify">Update</button>
 
 		<div id="crafty-maps-holder"></div>
-					
+
 		</div>
 	</div>
-	<script src="//maps.google.com/maps/api/js?sensor=false"></script>
+	<!-- new url and customisable google maps api key -->
+	<script src="//maps.googleapis.com/maps/api/js?key=<?php echo $confG['google_maps_api_key']?>"></script>
 	<script type="text/javascript">
-
 	<?php
 	if($confG['gmaps']):
 	?>
@@ -88,17 +88,23 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 			var map_options = {
 				center: new google.maps.LatLng(x,y),
 				zoom: 16,
-				mapTypeId: google.maps.MapTypeId.ROADMAP
+				mapTypeId: google.maps.MapTypeId.ROADMAP,
+				disableDefaultUI: true,
+				draggable: false
 			}
 			var map = new google.maps.Map(map_canvas, map_options);
+			var marker = new google.maps.Marker({
+				position: new google.maps.LatLng(x,y),
+				map: map
+			})
 		}
 	<?php
 	endif;
-
-	echo "var shipping = '" . json_encode ($shippingAddress->_data) . "'.evalJSON();";
+	// de-\n-ifyer code snippet - Greg (Crafty Clicks)
+	$shippingAddress->_data = str_replace("\n"," ",$shippingAddress->_data);
+	echo "var shipping = " . json_encode ($shippingAddress->_data) . ";";
 
 	?>
-
 	function check_match(infoHolder,original){
 		var flag = true;
 
@@ -108,7 +114,6 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 			flag = false;
 		if(typeof infoHolder.address !== "undefined" && original_address.toLowerCase().indexOf(infoHolder.combined_street.toLowerCase()) == -1)
 			flag = false;
-		
 		if(typeof infoHolder.country !== "undefined" && original.country.toLowerCase() != infoHolder.country.short_name.toLowerCase())
 			flag = false;
 
@@ -127,12 +132,9 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 		if(typeof google !== "undefined"){
 
 			var html = '<div class="buttons-set" id="correct_box"><img style="margin: auto;" src="<?php echo $loading_image; ?>"/></div>';
-			
 			$$('.buttons-set')[0].insert({before :html});
 
-
 			var address = shipping.street+" "+shipping.postcode+" "+shipping.city+" "+shipping.country_id;
-
 			var geocoder = new google.maps.Geocoder();
 
 			var original = new Object();
@@ -140,7 +142,6 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 			original.street = shipping.street.toLowerCase();
 			original.postalcode = shipping.postcode.toLowerCase();
 			original.city = shipping.city.toLowerCase();
-
 
 			var suggestions = new Array();
 			var data = new Array();
@@ -161,10 +162,11 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 							var mapsaddress = new Object();
 
 							//figure out the correct order of housenumber / street.
-							if(data[0].formatted.indexOf(data[0].route) > data[0].formatted.indexOf(data[0].street_number))
-								mapsaddress.street = data[0].street_number.long_name.toLowerCase() + " " + data[0].route.long_name.toLowerCase();
-							else						
-								mapsaddress.street = data[0].route.long_name.toLowerCase() + " " + data[0].street_number.long_name.toLowerCase();
+							if(data[0].formatted.indexOf(data[0].route.short_name) > data[0].formatted.indexOf(data[0].street_number.long_name)){
+								mapsaddress.street = data[0].street_number.long_name.toLowerCase() + " " + data[0].route.short_name.toLowerCase();
+							}
+							else
+								mapsaddress.street = data[0].route.short_name.toLowerCase() + " " + data[0].street_number.long_name.toLowerCase();
 
 							mapsaddress.postalcode = data[0].postal_code.long_name.toLowerCase();
 							mapsaddress.city = data[0].locality.long_name.toLowerCase();
@@ -183,12 +185,10 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 							} else {
 								doCheck = true;
 							}
-
 						} else {
 							doCheck = true;
 							//not premise level
 						}
-
 					}
 					else {
 						//super bogus data
@@ -199,9 +199,9 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 
 						$('correct_box').update($('hidden-correction').innerHTML);
 						$('hidden-correction').remove();
-
-						initialize_gmaps(results[0].geometry.location.lat(), results[0].geometry.location.lng());
-
+						if(results.length){
+							initialize_gmaps(results[0].geometry.location.lat(), results[0].geometry.location.lng());
+						}
 						$('address').value = shipping.street;
 						$('town').value = shipping.city;
 						$('postcode').value = shipping.postcode;
@@ -212,20 +212,20 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 							var options = $$('select#region_id option');
 							var len = options.length;
 							for (var i = 0; i < len; i++) {
-							    if(options[i].value == shipping.region_id){
-							    	options[i].selected = true;
-							    }
+								if(options[i].value == shipping.region_id){
+									options[i].selected = true;
+								}
 							}
 							//$('region_id')[shipping.region_id].selected = true;
 						} else {
 							$('region_id').hide();
 							$('region').value = shipping.region;
 						}
-						
+
 						data.forEach(function(element){
 							// if the data provided is premise level
 							if(typeof element.route !== "undefined" && typeof element.street_number !== "undefined"){
-								var address = '';					
+								var address = '';
 
 								var region = '';
 								if(typeof element.administrative_area_level_1 !== "undefined"){
@@ -244,7 +244,7 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 
 								var route = '';
 								if(typeof element.route !== "undefined"){
-									route = element.route.long_name;
+									route = element.route.short_name;
 								}
 
 								var street_number = '';
@@ -253,7 +253,7 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 								}
 								if(element.formatted.indexOf(route) > element.formatted.indexOf(street_number))
 									address = street_number + " " + route;
-								else						
+								else
 									address = route + " " + street_number;
 
 
@@ -293,10 +293,10 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 							if(elem.length == 1){
 								//gather all data and copy it to the form.
 								var li = elem[0].up('li');
-								$('address').value = li.readAttribute('data-street');
-								$('town').value = li.readAttribute('data-town');
-								$('postcode').value = li.readAttribute('data-postcode');
-								$('region').value = li.readAttribute('data-region');
+								$('address').value =	li.readAttribute('data-street');
+								$('town').value =		li.readAttribute('data-town');
+								$('postcode').value =	li.readAttribute('data-postcode');
+								$('region').value =		li.readAttribute('data-region');
 							} else {
 								//if it's manual & region dropdown is provided, copy the selected region value to the region form element.
 								if($('region_id').childElements('option').length){
@@ -304,21 +304,24 @@ if($confG['active'] && !($shippingAddress->country_id == 'GB' && 1 == $confC['ac
 								}
 							}
 							// pass all form values to an ajax request & update.
-							new Ajax.Request('<?php echo Mage::getUrl('googleaddressvalidate/ajax/update');?>',
+							new Ajax.Request('<?php echo Mage::getUrl('googleaddressvalidate/ajax/update',array('_secure'=>true));?>',
 							{
 								method:'get',
 								parameters: {
-									street: $('address').getValue(),
-									city: $('town').getValue(),
-									postcode: $('postcode').getValue(),
-									region: $('region').getValue()
+									street:		$('address').getValue(),
+									city:		$('town').getValue(),
+									postcode:	$('postcode').getValue(),
+									region:		$('region').getValue()
 								},
 								onSuccess: function(transport){
 									$('correct_box').update('<?php echo addslashes($confG['finish_text']); ?>');
 								}
 							});
 						});
-					
+
+					}
+					else {
+						$('correct_box').remove();
 					}
 				});
 			}
